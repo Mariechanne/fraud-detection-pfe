@@ -1,0 +1,28 @@
+# Environnements virtuels
+.venv/
+venv/
+env/
+
+# Données locales
+data/
+!data/.gitkeep
+
+# Cache et temporaires
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
+*.pyo
+*.log
+
+# Configs locales
+.env
+.DS_Store
+
+# Fichiers système ou IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Résultats de modèles
+models/
+reports/figures/
