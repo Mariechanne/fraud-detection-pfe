@@ -1,15 +1,18 @@
 # app/streamlit_app.py — Application professionnelle pour la détection de fraudes bancaires
-import json
 from datetime import datetime
 from pathlib import Path
 
-import joblib
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-import shap
 import streamlit as st
+
+# Import des modules src/
+from src.data.loader import ArtifactLoader
+from src.models.predictor import FraudPredictor
+from src.models.explainer import FraudExplainer
+from src.visualization.plots import FraudVisualizer
+from src.utils.validation import DataValidator
 
 # =========================
 # Configuration UI
@@ -177,49 +180,9 @@ st.markdown("---")
 # =========================
 @st.cache_resource(show_spinner=False)
 def load_artifacts():
-    """Charge les artefacts avec vérification de santé."""
-    errors = []
-    warnings = []
-
-    # Vérifier l'existence des fichiers
-    if not PIPE_PATH.exists():
-        errors.append(f"❌ Fichier modèle manquant: {PIPE_PATH}")
-    if not METRICS_PATH.exists():
-        warnings.append(f"⚠️ Fichier métriques manquant: {METRICS_PATH}")
-    if not COLS_PATH.exists():
-        warnings.append(f"⚠️ Fichier colonnes manquant: {COLS_PATH}")
-
-    if errors:
-        st.error("\n".join(errors))
-        st.stop()
-
-    # Charger les artefacts
-    pipe = joblib.load(PIPE_PATH)
-
-    if METRICS_PATH.exists():
-        with open(METRICS_PATH, "r", encoding="utf-8") as f:
-            m = json.load(f)
-    else:
-        m = {"pr_auc": 0, "roc_auc": 0, "recall": 0, "precision": 0, "threshold": 0.5}
-        warnings.append("📊 Métriques par défaut utilisées")
-
-    if COLS_PATH.exists():
-        with open(COLS_PATH, "r", encoding="utf-8") as f:
-            cols = json.load(f)
-    else:
-        cols = {"all_cols": ["Amount", "Time"] + [f"V{i}" for i in range(1, 29)]}
-        warnings.append("📋 Colonnes par défaut utilisées")
-
-    # Vérifier la cohérence du pipeline
-    try:
-        # Test de prédiction à blanc
-        test_df = pd.DataFrame(
-            [[0.0] * len(cols.get("all_cols", []))], columns=cols.get("all_cols", [])
-        )
-        _ = pipe.predict_proba(test_df)
-    except Exception as e:
-        warnings.append(f"⚠️ Divergence pipeline/colonnes détectée: {str(e)[:100]}")
-
+    """Charge les artefacts en utilisant ArtifactLoader."""
+    loader = ArtifactLoader(MODEL_DIR)
+    pipe, m, cols, warnings = loader.load_artifacts()
     return pipe, m, cols, warnings
 
 
@@ -234,11 +197,15 @@ if artifact_warnings:
 else:
     st.success("✅ Modèle chargé avec succès")
 
+# Initialiser le prédicateur et l'explainer
+THRESHOLD = float(metrics_valid["threshold"])
+EXPECTED_COLS = cols["all_cols"]
+predictor = FraudPredictor(pipe, EXPECTED_COLS, threshold=THRESHOLD)
+explainer = FraudExplainer(pipe)
+
 # =========================
 # Sidebar professionnelle
 # =========================
-THRESHOLD = float(metrics_valid["threshold"])
-
 with st.sidebar:
     st.markdown("## ⚙️ Configuration")
 
@@ -264,36 +231,7 @@ with st.sidebar:
     )
 
     # Jauge visuelle professionnelle
-    fig_gauge = go.Figure(
-        go.Indicator(
-            mode="gauge+number",
-            value=user_thr * 100,
-            domain={"x": [0, 1], "y": [0, 1]},
-            title={"text": "Sensibilité (%)", "font": {"size": 16, "color": "#2c3e50"}},
-            number={"suffix": "%", "font": {"size": 20, "color": "#2c3e50"}},
-            gauge={
-                "axis": {"range": [0, 50], "tickcolor": "#7f8c8d"},
-                "bar": {"color": "#3498db"},
-                "bgcolor": "#ecf0f1",
-                "steps": [
-                    {"range": [0, 15], "color": "#d5f4e6"},
-                    {"range": [15, 30], "color": "#fff3cd"},
-                    {"range": [30, 50], "color": "#f8d7da"},
-                ],
-                "threshold": {
-                    "line": {"color": "#e74c3c", "width": 3},
-                    "thickness": 0.75,
-                    "value": user_thr * 100,
-                },
-            },
-        )
-    )
-    fig_gauge.update_layout(
-        height=200,
-        margin=dict(l=20, r=20, t=40, b=20),
-        paper_bgcolor="rgba(0,0,0,0)",
-        font={"color": "#2c3e50"},
-    )
+    fig_gauge = FraudVisualizer.create_gauge(user_thr * 100, title="Sensibilité (%)")
     st.plotly_chart(fig_gauge, use_container_width=True)
 
     st.markdown("---")
@@ -343,90 +281,6 @@ with st.sidebar:
     st.caption(
         "💡 Un seuil plus élevé réduit les faux positifs mais peut manquer certaines fraudes."
     )
-
-# =========================
-# Helpers communs
-# =========================
-EXPECTED_COLS = cols["all_cols"]
-
-
-def ensure_dataframe_row(d: dict) -> pd.DataFrame:
-    df = pd.DataFrame([d])
-    for c in EXPECTED_COLS:
-        if c not in df.columns:
-            df[c] = 0.0
-    return df[EXPECTED_COLS]
-
-
-def infer(df: pd.DataFrame, thr: float = None):
-    thr = THRESHOLD if thr is None else float(thr)
-    proba = pipe.predict_proba(df)[:, 1]
-    pred = (proba >= thr).astype(int)
-    return proba, pred
-
-
-# =========================
-# Builder SHAP
-# =========================
-@st.cache_resource(show_spinner=False)
-def build_shap_explainer(_pipe):
-    model = _pipe.named_steps["model"]
-    prep = _pipe.named_steps["prep"]
-    try:
-        feat_out = prep.get_feature_names_out()
-        feature_names = [name.split("__")[-1] for name in feat_out]
-    except Exception:
-        feature_names = ["Amount", "Time"] + [f"V{i}" for i in range(1, 29)]
-    explainer = shap.TreeExplainer(model)
-    return explainer, feature_names
-
-
-explainer, FEATURE_NAMES = build_shap_explainer(pipe)
-
-
-@st.cache_data(show_spinner=False, ttl=300)
-def explain_top_features(x_json: str, top_k: int = 5):
-    """
-    Retourne les top_k features avec cache et fallback robuste.
-    Args:
-        x_json: DataFrame sérialisé en JSON pour compatibilité cache
-        top_k: Nombre de features à retourner
-    """
-    try:
-        # Désérialiser le DataFrame
-        x_df = pd.read_json(x_json, orient="split")
-
-        # Transformer
-        x_tr = pipe.named_steps["prep"].transform(x_df)
-        x_tr = x_tr.toarray() if hasattr(x_tr, "toarray") else np.asarray(x_tr)
-
-        # Valeurs SHAP
-        raw = explainer.shap_values(x_tr)
-        sv = raw[1] if isinstance(raw, list) else raw
-
-        sv = np.array(sv)
-        if sv.ndim == 3:
-            sv = sv.sum(axis=2)
-
-        sv = sv[0]
-        idx = np.argsort(np.abs(sv))[::-1][:top_k]
-
-        items = []
-        for i in idx:
-            items.append(
-                {
-                    "feature": FEATURE_NAMES[int(i)],
-                    "value": float(x_tr[0, int(i)]),
-                    "shap": float(sv[int(i)]),
-                    "direction": "↑ risque" if sv[int(i)] > 0 else "↓ risque",
-                }
-            )
-        return items, None
-
-    except Exception as e:
-        # Fallback: retourner erreur sans crasher
-        return [], f"Erreur SHAP: {str(e)[:200]}"
-
 
 # =========================
 # Transaction unique
@@ -515,8 +369,8 @@ if submitted:
         payload = {"Amount": amount, "Time": time}
         payload.update(vvals)
 
-    x = ensure_dataframe_row(payload)
-    proba, pred = infer(x, user_thr)
+    # Utiliser FraudPredictor
+    proba, pred = predictor.predict_single(payload, threshold=user_thr)
 
     st.markdown("---")
     st.markdown("## 📋 Résultat de l'Analyse")
@@ -525,24 +379,16 @@ if submitted:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        if pred[0] == 1:
+        if pred == 1:
             st.error("**🚨 FRAUDE DÉTECTÉE**")
         else:
             st.success("**✅ TRANSACTION NORMALE**")
 
     with col2:
-        st.metric("Probabilité", f"{proba[0]*100:.2f}%")
+        st.metric("Probabilité", f"{proba*100:.2f}%")
 
     with col3:
-        risk_level = (
-            "CRITIQUE"
-            if proba[0] >= 0.8
-            else (
-                "ÉLEVÉ"
-                if proba[0] >= 0.5
-                else "MODÉRÉ" if proba[0] >= 0.3 else "FAIBLE"
-            )
-        )
+        risk_level = predictor.get_risk_level(proba)
         st.metric("Niveau de risque", risk_level)
 
     with col4:
@@ -550,62 +396,27 @@ if submitted:
 
     # Barre de progression
     st.markdown("#### Score de fraude")
-    st.progress(float(min(proba[0], 1.0)))
+    st.progress(float(min(proba, 1.0)))
 
     # Graphique de probabilité
-    fig_proba = go.Figure()
-
-    fig_proba.add_trace(
-        go.Bar(
-            x=["Score"],
-            y=[proba[0]],
-            marker=dict(
-                color=["#e74c3c" if proba[0] >= user_thr else "#27ae60"],
-                line=dict(color="#2c3e50", width=2),
-            ),
-            text=f"{proba[0]*100:.2f}%",
-            textposition="auto",
-            textfont=dict(size=18, color="white"),
-            hovertemplate="<b>Probabilité</b>: %{y:.4f}<br><extra></extra>",
-        )
-    )
-
-    fig_proba.add_hline(
-        y=user_thr,
-        line_dash="dash",
-        line_color="#e74c3c",
-        annotation_text=f"Seuil: {user_thr:.4f}",
-        annotation_position="right",
-    )
-
-    fig_proba.update_layout(
-        title="Score de fraude vs Seuil de décision",
-        yaxis_title="Probabilité",
-        yaxis=dict(range=[0, 1]),
-        height=300,
-        paper_bgcolor="white",
-        plot_bgcolor="#f8f9fa",
-        font=dict(color="#2c3e50"),
-        showlegend=False,
-    )
-
+    fig_proba = FraudVisualizer.create_probability_bar(proba, user_thr)
     st.plotly_chart(fig_proba, use_container_width=True)
 
     # Recommandation
-    if proba[0] >= 0.8:
+    if proba >= 0.8:
         st.error("⚠️ **ALERTE CRITIQUE** - Investigation immédiate recommandée")
-    elif proba[0] >= 0.5:
+    elif proba >= 0.5:
         st.warning("⚠️ **ALERTE** - Vérification manuelle conseillée")
-    elif proba[0] >= 0.3:
+    elif proba >= 0.3:
         st.info("ℹ️ **SURVEILLANCE** - Transaction à surveiller")
     else:
         st.success("✅ **NORMAL** - Transaction conforme")
 
     # Explications SHAP
     with st.expander("📊 Analyse détaillée des facteurs", expanded=True):
-        # Sérialiser pour cache
-        x_json = x.to_json(orient="split")
-        reasons, error = explain_top_features(x_json, top_k=5)
+        # Utiliser FraudExplainer
+        x_df = pd.DataFrame([payload])
+        reasons, error = explainer.explain(x_df, top_k=5)
 
         if error:
             st.warning(
@@ -635,35 +446,8 @@ if submitted:
                     st.markdown("---")
 
             with col_exp2:
-                # Graphique SHAP
-                fig_shap = go.Figure()
-
-                features = [r["feature"] for r in reasons]
-                shap_values = [r["shap"] for r in reasons]
-                colors = ["#e74c3c" if v > 0 else "#27ae60" for v in shap_values]
-
-                fig_shap.add_trace(
-                    go.Bar(
-                        y=features,
-                        x=shap_values,
-                        orientation="h",
-                        marker=dict(color=colors, line=dict(color="#2c3e50", width=1)),
-                        text=[f"{v:.4e}" for v in shap_values],
-                        textposition="auto",
-                        hovertemplate="<b>%{y}</b><br>SHAP: %{x:.4e}<extra></extra>",
-                    )
-                )
-
-                fig_shap.update_layout(
-                    title="Contributions SHAP",
-                    xaxis_title="Impact sur la prédiction",
-                    height=300,
-                    paper_bgcolor="white",
-                    plot_bgcolor="#f8f9fa",
-                    font=dict(color="#2c3e50"),
-                    xaxis=dict(zeroline=True, zerolinecolor="#2c3e50", zerolinewidth=2),
-                )
-
+                # Graphique SHAP avec FraudVisualizer
+                fig_shap = FraudVisualizer.create_shap_bar(reasons)
                 st.plotly_chart(fig_shap, use_container_width=True)
 
             st.info(
@@ -687,20 +471,24 @@ up = st.file_uploader("Sélectionner un fichier CSV", type=["csv"])
 
 if up is not None:
     try:
-        # Lecture initiale pour vérifier la taille
+        # Lecture initiale
         df_in = pd.read_csv(up)
-        n_rows = len(df_in)
 
-        # Limite de sécurité
-        MAX_ROWS = 100_000
-        if n_rows > MAX_ROWS:
-            st.error(
-                f"❌ Fichier trop volumineux: {n_rows:,} lignes. Maximum autorisé: {MAX_ROWS:,} lignes."
-            )
+        # Validation avec DataValidator
+        validator = DataValidator(EXPECTED_COLS, max_rows=100_000)
+        is_valid, errors = validator.validate_dataframe(df_in)
+
+        if not is_valid:
+            for error in errors:
+                st.error(f"❌ {error}")
             st.info(
-                "💡 Conseil: Divisez votre fichier en plusieurs parties ou contactez l'administrateur pour augmenter la limite."
+                "💡 Conseil: Divisez votre fichier en plusieurs parties ou vérifiez le format des données."
             )
             st.stop()
+
+        # Nettoyer les données
+        df = validator.sanitize_dataframe(df_in)
+        n_rows = len(df)
 
         if n_rows > 10_000:
             st.warning(
@@ -711,43 +499,27 @@ if up is not None:
         st.error(f"Erreur de lecture du fichier: {e}")
         st.stop()
 
-    # Harmoniser colonnes
-    df = df_in.copy()
-    for c in EXPECTED_COLS:
-        if c not in df.columns:
-            df[c] = 0.0
-    df = df[EXPECTED_COLS].fillna(0.0)
-
-    # Inférence par chunks pour les gros fichiers
+    # Utiliser FraudPredictor pour les prédictions par batch
     CHUNK_SIZE = 5000
 
     if n_rows > CHUNK_SIZE:
         st.info(f"📦 Traitement par batch de {CHUNK_SIZE:,} lignes...")
 
-        all_proba = []
-        all_pred = []
-
         progress_bar = st.progress(0)
         status_text = st.empty()
 
-        n_chunks = (n_rows + CHUNK_SIZE - 1) // CHUNK_SIZE
-
-        for i in range(0, n_rows, CHUNK_SIZE):
-            chunk = df.iloc[i : i + CHUNK_SIZE]
-            chunk_proba, chunk_pred = infer(chunk, user_thr)
-
-            all_proba.extend(chunk_proba)
-            all_pred.extend(chunk_pred)
-
-            # Mise à jour progression
-            progress = min((i + CHUNK_SIZE) / n_rows, 1.0)
+        # Callback pour mise à jour de progression
+        def update_progress(current, total):
+            progress = current / total
             progress_bar.progress(progress)
-            status_text.text(
-                f"Traité: {min(i + CHUNK_SIZE, n_rows):,} / {n_rows:,} lignes"
-            )
+            status_text.text(f"Traité: {current:,} / {total:,} lignes")
 
-        proba = np.array(all_proba)
-        pred = np.array(all_pred)
+        # Utiliser predict_batch qui gère automatiquement les chunks
+        proba, pred = predictor.predict_batch(df, chunk_size=CHUNK_SIZE, threshold=user_thr)
+
+        # Simuler la progression pour l'affichage
+        for i in range(0, n_rows, CHUNK_SIZE):
+            update_progress(min(i + CHUNK_SIZE, n_rows), n_rows)
 
         progress_bar.empty()
         status_text.empty()
@@ -756,17 +528,14 @@ if up is not None:
     else:
         # Traitement direct pour petits fichiers
         with st.spinner("Analyse en cours..."):
-            proba, pred = infer(df, user_thr)
+            proba, pred = predictor.predict(df, threshold=user_thr)
 
     # Résultats
     out = df_in.copy()
     out["fraud_proba"] = proba
     out["fraud_pred"] = pred
-    out["risk_level"] = pd.cut(
-        proba,
-        bins=[0, 0.3, 0.5, 0.8, 1.0],
-        labels=["FAIBLE", "MODÉRÉ", "ÉLEVÉ", "CRITIQUE"],
-    )
+    # Utiliser get_risk_level du predictor
+    out["risk_level"] = out["fraud_proba"].apply(predictor.get_risk_level)
 
     n_alertes = int((pred == 1).sum())
     n_total = len(out)
@@ -898,25 +667,8 @@ if up is not None:
             st.success("Aucune fraude dans ce lot")
 
     with tab3:
-        # Histogramme
-        fig_hist = px.histogram(
-            out,
-            x="fraud_proba",
-            nbins=50,
-            title="Distribution des probabilités de fraude",
-            labels={"fraud_proba": "Probabilité de fraude"},
-            color_discrete_sequence=["#3498db"],
-        )
-        fig_hist.update_layout(
-            paper_bgcolor="white", plot_bgcolor="#f8f9fa", font=dict(color="#2c3e50")
-        )
-        fig_hist.add_vline(
-            x=user_thr,
-            line_dash="dash",
-            line_color="#e74c3c",
-            annotation_text=f"Seuil: {user_thr:.3f}",
-            annotation_position="top",
-        )
+        # Histogramme avec FraudVisualizer
+        fig_hist = FraudVisualizer.create_histogram(out["fraud_proba"].values, user_thr)
         st.plotly_chart(fig_hist, use_container_width=True)
 
         # Statistiques
@@ -927,29 +679,9 @@ if up is not None:
         col_s4.metric("Maximum", f"{out['fraud_proba'].max():.4f}")
 
     with tab4:
-        # Camembert des risques
-        risk_counts = out["risk_level"].value_counts()
-
-        fig_pie = go.Figure(
-            data=[
-                go.Pie(
-                    labels=risk_counts.index,
-                    values=risk_counts.values,
-                    hole=0.4,
-                    marker=dict(colors=["#27ae60", "#f39c12", "#e67e22", "#e74c3c"]),
-                    textinfo="label+percent",
-                    textfont=dict(size=14),
-                )
-            ]
-        )
-
-        fig_pie.update_layout(
-            title="Répartition par niveau de risque",
-            paper_bgcolor="white",
-            font=dict(color="#2c3e50"),
-            height=400,
-        )
-
+        # Camembert des risques avec FraudVisualizer
+        risk_counts = out["risk_level"].value_counts().to_dict()
+        fig_pie = FraudVisualizer.create_risk_pie(risk_counts)
         st.plotly_chart(fig_pie, use_container_width=True)
 
         # Tableau récapitulatif
