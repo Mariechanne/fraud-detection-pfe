@@ -6,6 +6,8 @@ env/
 # Données locales (mais pas src/data/)
 /data/
 !data/.gitkeep
+!data/*/README.md
+!data/examples/*.csv
 
 # Cache et temporaires
 __pycache__/
@@ -25,4 +27,5 @@ __pycache__/
 
 # Résultats de modèles (mais pas src/models/)
 /models/
+!models/README.md
 reports/figures/
