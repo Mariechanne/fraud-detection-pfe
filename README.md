@@ -10,6 +10,33 @@ Application web interactive développée avec **Streamlit** permettant de détec
 
 ---
 
+## ⚡ Installation Rapide
+
+> **🚨 IMPORTANT** : Ce projet nécessite des données et un modèle entraîné (non inclus dans Git).
+
+**Pour une installation complète étape par étape, consultez :**
+
+### 👉 **[SETUP.md](SETUP.md) - Guide d'Installation Complet**
+
+**Installation automatique (recommandé) :**
+
+```bash
+git clone https://github.com/Mariechanne/fraud-detection-pfe.git
+cd fraud-detection-pfe
+bash scripts/setup.sh
+```
+
+Le script `setup.sh` va :
+1. ✅ Créer l'environnement virtuel
+2. ✅ Installer les dépendances
+3. ⏸️ Vous demander de télécharger les données Kaggle
+4. ✅ Entraîner le modèle automatiquement
+5. ✅ Lancer les tests
+
+**Temps estimé :** 10-15 minutes (selon votre connexion)
+
+---
+
 ## 📸 Aperçu
 
 - ✅ **Application Streamlit** professionnelle et interactive
@@ -21,32 +48,29 @@ Application web interactive développée avec **Streamlit** permettant de détec
 
 ---
 
-## 🚀 Démarrage Rapide
+## 🚀 Utilisation (après installation)
 
-### Installation
-
-```bash
-# Cloner le projet
-git clone https://github.com/Mariechanne/fraud-detection-pfe.git
-cd fraud-detection-pfe
-
-# Créer un environnement virtuel
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# ou
-.venv\Scripts\activate  # Windows
-
-# Installer les dépendances
-pip install -r requirements.txt
-```
-
-### Lancer l'Application
+Une fois le setup terminé (voir [SETUP.md](SETUP.md)) :
 
 ```bash
+# Lancer l'application web
 streamlit run app/streamlit_app.py
 ```
 
 L'application s'ouvrira automatiquement à `http://localhost:8501`
+
+**Autres commandes :**
+
+```bash
+# Prédiction en ligne de commande
+python scripts/predict.py --model models/rf_smote_final --file data/examples/sample_transactions.csv
+
+# Ré-entraîner le modèle
+python scripts/train_model.py --data data/raw/creditcard.csv
+
+# Lancer les tests
+pytest tests/ -v
+```
 
 ---
 
