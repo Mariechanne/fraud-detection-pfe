@@ -9,6 +9,7 @@ imbalanced-learn>=0.12
 
 # --- Visualisation & interprétation ---
 matplotlib>=3.8
+seaborn>=0.13
 plotly>=5.22
 shap>=0.45
 
