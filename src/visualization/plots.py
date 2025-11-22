@@ -22,7 +22,7 @@ class FraudVisualizer:
         Crée une jauge pour afficher un pourcentage.
 
         Args:
-            value: Valeur entre 0 et 1
+            value: Valeur en pourcentage (ex: 7.5 pour 7.5%)
             title: Titre de la jauge
 
         Returns:
@@ -31,7 +31,7 @@ class FraudVisualizer:
         fig = go.Figure(
             go.Indicator(
                 mode="gauge+number",
-                value=value * 100,
+                value=value,  # Valeur déjà en pourcentage
                 domain={"x": [0, 1], "y": [0, 1]},
                 title={
                     "text": title,
@@ -50,7 +50,7 @@ class FraudVisualizer:
                     "threshold": {
                         "line": {"color": FraudVisualizer.COLOR_FRAUD, "width": 3},
                         "thickness": 0.75,
-                        "value": value * 100,
+                        "value": value,  # Valeur déjà en pourcentage
                     },
                 },
             )
