@@ -188,7 +188,7 @@ Preprocessing (StandardScaler sur Amount & Time)
     ↓
 SMOTE (Rééquilibrage à 20%)
     ↓
-Random Forest (100 arbres, max_depth=20)
+Random Forest (300 arbres, n_jobs=-1)
     ↓
 Optimisation du seuil (Recall ≥ 85%)
     ↓
