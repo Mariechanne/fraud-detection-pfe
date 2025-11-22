@@ -3,8 +3,8 @@
 venv/
 env/
 
-# Données locales
-data/
+# Données locales (mais pas src/data/)
+/data/
 !data/.gitkeep
 
 # Cache et temporaires
@@ -23,6 +23,6 @@ __pycache__/
 .idea/
 *.code-workspace
 
-# Résultats de modèles
-models/
+# Résultats de modèles (mais pas src/models/)
+/models/
 reports/figures/
