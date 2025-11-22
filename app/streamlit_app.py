@@ -819,7 +819,9 @@ if up is not None:
             idx = idx.tail(100)
             idx.to_csv(index_path, index=False)
 
-        st.success(f"📦 Archivé automatiquement : `reports/predictions/{archive_path.name}`")
+        st.success(
+            f"📦 Archivé automatiquement : `reports/predictions/{archive_path.name}`"
+        )
 
     # Statistiques principales
     st.markdown("### 📊 Résumé de l'analyse")
