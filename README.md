@@ -23,6 +23,34 @@ Application web interactive développée avec **Streamlit** permettant de détec
 
 ---
 
+## 🖼️ Captures d'Écran
+
+### Interface Principale
+
+> **💡 Astuce** : Consultez [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md) pour savoir comment prendre ces captures.
+
+<!-- Décommentez et ajoutez vos images ci-dessous -->
+
+<!--
+### Vue d'ensemble de l'application
+![Vue d'ensemble](docs/images/app-overview.png)
+
+### Analyse de Transaction Unique
+![Formulaire](docs/images/single-transaction-form.png)
+
+### Résultat de l'Analyse avec SHAP
+![Résultat](docs/images/single-transaction-result.png)
+![Explications SHAP](docs/images/shap-explanation.png)
+
+### Analyse par Lot (CSV)
+![Analyse batch](docs/images/batch-analysis.png)
+![Résultats batch](docs/images/batch-results-tabs.png)
+-->
+
+**📌 Note** : Les captures d'écran seront ajoutées après avoir lancé l'application. Voir le guide dans `docs/SCREENSHOTS.md`.
+
+---
+
 ## 📊 Performances du Modèle
 
 | Métrique | Score | Interprétation |
