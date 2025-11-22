@@ -29,3 +29,8 @@ __pycache__/
 /models/
 !models/README.md
 reports/figures/
+
+# Documentation (autoriser les images de screenshots)
+!docs/images/*.png
+!docs/images/*.jpg
+!docs/images/*.jpeg
