@@ -218,7 +218,6 @@ Modèle final + Explications SHAP
 
 - 📖 **[Guide Utilisateur](docs/USER_GUIDE.md)** - Installation, utilisation de l'app et des scripts
 - 👨‍💻 **[Guide Développeur](docs/DEVELOPER_GUIDE.md)** - Architecture, API, tests, déploiement
-- 📝 **[Scripts README](scripts/README)** - Documentation technique détaillée
 
 ---
 
