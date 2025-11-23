@@ -14,7 +14,7 @@ Application web interactive développée avec **Streamlit** permettant de détec
 ## 📸 Aperçu de l'Application
 
 ### Interface Complète
-![Interface complète](docs/images/00_interface_globale.png)
+![Interface complète](docs/images/01_interface_globale.png)
 *Vue d'ensemble de l'application avec sidebar de configuration et sections d'analyse*
 
 ### Détection de Fraude avec IA
