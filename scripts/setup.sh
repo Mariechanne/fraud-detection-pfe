@@ -25,14 +25,19 @@ NC='\033[0m' # No Color
 # =============================================================================
 echo -e "${BLUE}[1/7]${NC} Vérification de Python..."
 
-if ! command -v python3 &> /dev/null; then
+# Détecter quelle commande Python est disponible
+if command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+elif command -v python &> /dev/null; then
+    PYTHON_CMD="python"
+else
     echo -e "${RED}❌ Python 3 n'est pas installé${NC}"
     echo "   Installez Python 3.11+ depuis https://www.python.org/downloads/"
     exit 1
 fi
 
-PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
-echo -e "${GREEN}✅${NC} Python $PYTHON_VERSION détecté"
+PYTHON_VERSION=$($PYTHON_CMD --version | cut -d' ' -f2 | cut -d'.' -f1,2)
+echo -e "${GREEN}✅${NC} Python $PYTHON_VERSION détecté (commande: $PYTHON_CMD)"
 echo ""
 
 # =============================================================================
@@ -45,7 +50,6 @@ mkdir -p data/processed
 mkdir -p data/examples
 mkdir -p models/rf_smote_final
 mkdir -p reports/predictions
-mkdir -p .venv
 
 echo -e "${GREEN}✅${NC} Structure créée"
 echo ""
@@ -55,13 +59,22 @@ echo ""
 # =============================================================================
 echo -e "${BLUE}[3/7]${NC} Configuration de l'environnement virtuel..."
 
-if [ ! -d ".venv/bin" ]; then
+if [ ! -d ".venv/bin" ] && [ ! -d ".venv/Scripts" ]; then
     echo "   Création de l'environnement virtuel..."
-    python3 -m venv .venv
+    $PYTHON_CMD -m venv .venv
 fi
 
-# Activer l'environnement virtuel
-source .venv/bin/activate
+# Activer l'environnement virtuel (selon l'OS)
+if [ -f ".venv/Scripts/activate" ]; then
+    # Windows (Git Bash)
+    source .venv/Scripts/activate
+elif [ -f ".venv/bin/activate" ]; then
+    # Linux/macOS
+    source .venv/bin/activate
+else
+    echo -e "${RED}❌ Impossible de trouver le script d'activation${NC}"
+    exit 1
+fi
 
 echo -e "${GREEN}✅${NC} Environnement virtuel activé"
 echo ""
@@ -71,8 +84,8 @@ echo ""
 # =============================================================================
 echo -e "${BLUE}[4/7]${NC} Installation des dépendances Python..."
 
-pip install --upgrade pip --quiet
-pip install -r requirements.txt --quiet
+$PYTHON_CMD -m pip install --upgrade pip --quiet
+$PYTHON_CMD -m pip install -r requirements.txt --quiet
 
 echo -e "${GREEN}✅${NC} Dépendances installées"
 echo ""
@@ -97,8 +110,12 @@ if [ ! -f "data/raw/creditcard.csv" ]; then
     echo "   bash scripts/setup.sh"
     exit 0
 else
-    FILE_SIZE=$(du -h data/raw/creditcard.csv | cut -f1)
-    echo -e "${GREEN}✅${NC} Dataset trouvé ($FILE_SIZE)"
+    if command -v du &> /dev/null; then
+        FILE_SIZE=$(du -h data/raw/creditcard.csv 2>/dev/null | cut -f1)
+        echo -e "${GREEN}✅${NC} Dataset trouvé ($FILE_SIZE)"
+    else
+        echo -e "${GREEN}✅${NC} Dataset trouvé"
+    fi
 fi
 echo ""
 
@@ -111,11 +128,12 @@ if [ ! -f "models/rf_smote_final/pipeline.joblib" ]; then
     echo "   🔧 Entraînement du modèle (5-10 minutes)..."
     echo "   Patientez..."
 
-    python scripts/train_model.py \
+    $PYTHON_CMD scripts/train_model.py \
         --data data/raw/creditcard.csv \
         --output models/rf_smote_final \
         --smote-strategy 0.2
 
+    # Vérifier immédiatement le résultat
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅${NC} Modèle entraîné et sauvegardé"
     else
@@ -134,8 +152,12 @@ echo -e "${BLUE}[7/7]${NC} Vérification finale..."
 
 # Vérifier le modèle
 if [ -f "models/rf_smote_final/pipeline.joblib" ]; then
-    MODEL_SIZE=$(du -h models/rf_smote_final/pipeline.joblib | cut -f1)
-    echo -e "${GREEN}✅${NC} Modèle : $MODEL_SIZE"
+    if command -v du &> /dev/null; then
+        MODEL_SIZE=$(du -h models/rf_smote_final/pipeline.joblib 2>/dev/null | cut -f1)
+        echo -e "${GREEN}✅${NC} Modèle : $MODEL_SIZE"
+    else
+        echo -e "${GREEN}✅${NC} Modèle présent"
+    fi
 else
     echo -e "${RED}❌${NC} Modèle manquant"
     exit 1
@@ -148,15 +170,17 @@ else
     echo -e "${YELLOW}⚠️${NC}  Données prétraitées manquantes"
 fi
 
-# Exécuter les tests
-echo ""
-echo "   Exécution des tests..."
-pytest tests/ -q --tb=no
-
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅${NC} Tests réussis"
+# Exécuter les tests (si pytest est disponible)
+if command -v pytest &> /dev/null; then
+    echo ""
+    echo "   Exécution des tests..."
+    if pytest tests/ -q --tb=no 2>/dev/null; then
+        echo -e "${GREEN}✅${NC} Tests réussis"
+    else
+        echo -e "${YELLOW}⚠️${NC}  Certains tests ont échoué (mais l'installation est OK)"
+    fi
 else
-    echo -e "${YELLOW}⚠️${NC}  Certains tests ont échoué (mais l'installation est OK)"
+    echo -e "${YELLOW}⚠️${NC}  pytest non disponible (ignoré)"
 fi
 
 echo ""
@@ -166,7 +190,18 @@ echo "=================================="
 echo ""
 echo "🚀 Pour lancer l'application :"
 echo ""
-echo "   streamlit run app/streamlit_app.py"
+if [ -f ".venv/Scripts/activate" ]; then
+    # Instructions Windows
+    echo "   # Windows PowerShell"
+    echo "   .venv\\Scripts\\Activate.ps1"
+    echo "   \$env:PYTHONPATH = \".\""
+    echo "   streamlit run app/streamlit_app.py"
+elif [ -f ".venv/bin/activate" ]; then
+    # Instructions Linux/macOS
+    echo "   source .venv/bin/activate"
+    echo "   export PYTHONPATH=\".\""
+    echo "   streamlit run app/streamlit_app.py"
+fi
 echo ""
 echo "   Puis ouvrez : http://localhost:8501"
 echo ""

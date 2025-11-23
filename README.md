@@ -42,6 +42,8 @@ Application web interactive développée avec **Streamlit** permettant de détec
 
 ---
 
+---
+
 ## 📋 Contexte et Objectifs
 
 Ce projet implémente un système de détection de fraudes bancaires utilisant des techniques de Machine Learning avancées. Face au déséquilibre extrême des données (0.17% de fraudes), l'objectif principal est de **maximiser le taux de détection (Recall)** tout en maintenant un nombre acceptable de fausses alertes.
@@ -211,9 +213,11 @@ fraud-detection-pfe/
 - Python 3.11+
 - Git
 - 500 MB d'espace disque (dataset + modèle)
+- VS Code
 
-### Installation Automatique (Recommandé)
+### Installation Automatique 
 
+⚠️ **Note** : Le script d'installation automatique est fourni mais peut nécessiter des ajustements selon votre système. **L'installation manuelle est plus fiable.**
 ```bash
 # 1. Cloner le projet
 git clone https://github.com/Mariechanne/fraud-detection-pfe.git
@@ -234,7 +238,7 @@ Le script va :
 
 ---
 
-### Installation Manuelle
+### Installation Manuelle (Recommandé)
 
 ```bash
 # 1. Environnement virtuel
@@ -264,10 +268,19 @@ pytest tests/ -v
 
 #### 1. Application Web
 
+**Lancer l'application :**
+
 ```bash
+# Windows PowerShell
+$env:PYTHONPATH = "."
 streamlit run app/streamlit_app.py
-# Ouvre http://localhost:8501
+
+# Linux/macOS/Git Bash
+export PYTHONPATH="."
+streamlit run app/streamlit_app.py
 ```
+
+Puis ouvrez : http://localhost:8501
 
 **Fonctionnalités** :
 - 🔍 **Analyse de transaction unique** : Formulaire interactif avec prédiction en temps réel
@@ -279,18 +292,29 @@ streamlit run app/streamlit_app.py
 #### 2. Prédiction en Ligne de Commande
 
 **Transaction unique :**
+
 ```bash
+# Linux/macOS/Git Bash
 python scripts/predict.py \
   --model models/rf_smote_final \
-  --transaction '{"Amount": 100.50, "Time": 50000}'
+  --amount 100.50 \
+  --time 50000
+
+# Windows PowerShell
+python scripts/predict.py --model models/rf_smote_final --amount 100.50 --time 50000
 ```
 
 **Fichier CSV :**
+
 ```bash
+# Linux/macOS/Git Bash
 python scripts/predict.py \
   --model models/rf_smote_final \
-  --file data/examples/sample_transactions.csv \
+  --input data/examples/sample_transactions.csv \
   --output predictions.csv
+
+# Windows PowerShell
+python scripts/predict.py --model models/rf_smote_final --input data/examples/sample_transactions.csv --output predictions.csv
 ```
 
 #### 3. Lancer les Tests
@@ -418,21 +442,18 @@ Ce projet est sous licence **MIT**. Voir le fichier [LICENSE](LICENSE) pour plus
 ## 🙏 Remerciements
 
 - **Dataset** : [Credit Card Fraud Detection (Kaggle)](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud) par ULB Machine Learning Group
-- **Encadrement** : [Nom de votre encadrant/tuteur] - [Institution : ESLSCA Rabat / Nom de votre université]
+- **Encadrement** : M. DOUMI KARIM / M. KHALID BENABBESS - ESLSCA Paris – Campus Rabat
 - **Inspirations** : Documentation scikit-learn, SMOTE paper, SHAP paper
 
 ---
 
 ## 📞 Contact et Support
 
-- **Auteur :** Marie Chandeste Melvina J. H. Medetadji Migan 
+- **Auteure** : Marie Chandeste Melvina J. H. Medetadji Migan
 - **Formation** : Licence Professionnelle en Data Science pour la Gestion des Entreprises
 - **Email** : melvinamedetadji@gmail.com
-- **GitHub** : https://github.com/Mariechanne
-- **Kaggle** : https://www.kaggle.com/melvinamedetadji
-- **Année académique :** 2024 – 2025
-- **Encadrant :** M. DOUMI KARIM / M. KHALID BENABBESS
-- **Établissement :** ESLSCA Paris – Campus Rabat
+- **GitHub** : https://github.com/Mariechanne/fraud-detection-pfe
+- **Kaggle** : (https://www.kaggle.com/melvinamedetadji)
 
 **Problème non résolu ?** Consultez :
 1. Les README dans chaque dossier (`data/*/README.md`, `models/README.md`)
@@ -452,12 +473,13 @@ Ce projet est sous licence **MIT**. Voir le fichier [LICENSE](LICENSE) pour plus
 - [ ] Tests passent (`pytest tests/ -v` → 22 passed ✅)
 - [ ] Application lance (`streamlit run app/streamlit_app.py`)
 
+**Si tous les points sont cochés** → ✅ **Votre projet est prêt pour la soutenance !**
 
 ---
 
 <div align="center">
 
-**Développé pour la détection de fraudes bancaires**
+**Développé avec ❤️ pour la détection de fraudes bancaires**
 
 *Projet de Fin d'Études — ESLSCA Rabat*
 
