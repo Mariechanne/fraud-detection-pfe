@@ -53,7 +53,10 @@ Ce projet implémente un système de détection de fraudes bancaires utilisant d
 **Solution développée :**
 - ✅ Application web Streamlit pour analyse en temps réel
 - ✅ Pipeline ML avec gestion du déséquilibre (SMOTE)
+- ✅ Comparaison rigoureuse de 3 algorithmes (LogReg, RF, XGBoost)
+- ✅ Cross-validation 5-fold pour validation robuste
 - ✅ Modèle Random Forest optimisé (300 arbres)
+- ✅ Visualisations complètes (matrices confusion, courbes ROC/PR)
 - ✅ Explications SHAP pour l'interprétabilité
 - ✅ Architecture modulaire testée (22 tests unitaires)
 - ✅ Documentation complète (guides utilisateur et développeur)
@@ -93,39 +96,77 @@ Prétraitement (StandardScaler sur Amount/Time)
     ↓
 SMOTE (20% de la classe majoritaire)
     ↓
-Random Forest (300 arbres, n_jobs=-1)
+Modélisation avec 3 algorithmes
+    ├─ Logistic Regression (baseline)
+    ├─ Random Forest (300 arbres)
+    └─ XGBoost
     ↓
-Validation croisée 5-fold
+Cross-validation 5-fold pour chaque modèle
+    ↓
+Visualisations complètes (matrices, courbes ROC/PR)
     ↓
 Optimisation du seuil (max Recall avec Precision ≥ 20%)
     ↓
-Évaluation sur test set
+Sélection du meilleur modèle (Random Forest)
+    ↓
+Évaluation finale sur test set + SHAP
 ```
 
 ### Comparaison de Modèles
 
-| Modèle | PR-AUC | Recall | Precision | F1-Score |
-|--------|--------|--------|-----------|----------|
-| Logistic Regression | 0.783 | 88.7% | 22.7% | 0.362 |
-| **Random Forest** | **0.865** | **82.9%** | **87.0%** | **0.848** |
-| XGBoost | 0.853 | 83.4% | 81.7% | 0.825 |
+#### Métriques Cross-Validation 5-fold
 
-**Modèle retenu :** Random Forest (meilleur compromis PR-AUC/Precision)
+| Modèle | ROC-AUC | PR-AUC | Recall | Precision | F1-Score |
+|--------|---------|--------|--------|-----------|----------|
+| Logistic Regression | 0.9817 ± 0.0082 | 0.7825 ± 0.0385 | 88.7% ± 2.5% | 22.7% ± 1.6% | 0.362 ± 0.018 |
+| **Random Forest** | **0.9802 ± 0.0123** | **0.8646 ± 0.0178** | **82.9% ± 1.1%** | **87.0% ± 3.1%** | **0.848 ± 0.013** |
+| XGBoost | 0.9785 ± 0.0080 | 0.8528 ± 0.0202 | 83.4% ± 2.0% | 81.7% ± 3.5% | 0.825 ± 0.022 |
+
+**Observations :**
+- **Random Forest** : Meilleur PR-AUC (0.8646) et F1-Score (0.848) → Gestion optimale du déséquilibre
+- Precision élevée en CV (87%) grâce au seuil par défaut (0.5)
+- Faible écart-type (±1.1%) → Modèle très stable
+
+#### Performances sur Validation Set (avec seuil optimisé)
+
+| Modèle | Fraudes détectées | Fraudes manquées | Fausses alertes | Recall | Precision | PR-AUC |
+|--------|-------------------|------------------|-----------------|--------|-----------|--------|
+| Logistic Regression | 62/74 | 12 | 248 | 83.78% | 20.00% | 0.6594 |
+| **Random Forest** | **65/74** | **9** | **243** | **87.84%** | **21.10%** | **0.8335** |
+| XGBoost | 63/74 | 11 | 252 | 85.14% | 20.00% | 0.8262 |
+
+**Modèle retenu :** Random Forest
+- ✅ **+3 fraudes détectées** vs Logistic Regression
+- ✅ **-5 fausses alertes** vs Logistic Regression  
+- ✅ **+26% PR-AUC** vs Logistic Regression
+- ✅ Meilleur compromis global pour la détection de fraude
 
 ---
 
+
 ## 🎯 Résultats et Performances
 
-### Métriques Finales (Validation Set)
+### Métriques Finales (Validation Set avec seuil optimisé)
 
 | Métrique | Valeur | Interprétation |
 |----------|--------|----------------|
 | **ROC-AUC** | **0.973** | ⭐⭐⭐⭐⭐ Excellente capacité de discrimination |
-| **PR-AUC** | **0.840** | ⭐⭐⭐⭐⭐ Excellent pour données déséquilibrées |
-| **Recall** | **87.8%** | Détecte 65/74 fraudes réelles (seulement 9 manquées) |
-| **Precision** | **21.1%** | 1 alerte sur 5 est une vraie fraude (65/308 alertes) |
-| **F1-Score** | **0.340** | Bon équilibre global |
+| **PR-AUC** | **0.833** | ⭐⭐⭐⭐⭐ Excellent pour données déséquilibrées |
+| **Recall** | **87.84%** | Détecte 65/74 fraudes réelles (seulement 9 manquées) |
+| **Precision** | **21.10%** | 1 alerte sur 5 est une vraie fraude (65/308 alertes) |
+| **F1-Score** | **0.340** | Bon équilibre avec priorité Recall |
 | **Seuil optimal** | **0.0733** | Optimisé pour maximiser le Recall |
+
+### Performances sur Test Set (Validation finale)
+
+| Métrique | Test | Validation | Cohérence |
+|----------|------|------------|-----------|
+| **ROC-AUC** | 0.9752 | 0.9729 | ✅ Stable |
+| **PR-AUC** | 0.8404 | 0.8326 | ✅ Cohérent |
+| **Recall** | 86.49% | 87.84% | ✅ Comparable |
+| **Precision** | 20.71% | 21.10% | ✅ Cohérent |
+
+**Conclusion :** Le modèle est stable entre VALID et TEST → Pas de surapprentissage
 
 ### Matrice de Confusion (Validation Set : 42,721 transactions)
 
