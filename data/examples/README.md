@@ -1,51 +1,56 @@
-# 📁 data/examples/
+# Fichiers d'Exemple pour Tests
 
-Ce dossier contient des **exemples de données** pour tester l'application sans le dataset complet.
+Ce dossier contient des fichiers CSV d'exemple générés à partir du test set.
+Ils permettent de tester la fonctionnalité "Analyse par Lot (CSV)" de l'application Streamlit.
 
-## Fichiers
+## Fichiers Disponibles
 
-### `sample_transactions.csv`
+### `sample_transactions_small.csv` (100 lignes)
+- **Usage** : Tests rapides, démos courtes
+- **Contenu** : Échantillon stratifié du test set
+- **Temps traitement** : < 1 seconde
 
-Petit échantillon de 5 transactions du dataset original, utilisable pour :
-- Tester l'interface Streamlit (upload CSV)
-- Démontrer les prédictions batch
-- Vérifier que l'application fonctionne
+### `sample_transactions_medium.csv` (1,000 lignes)
+- **Usage** : Démonstrations standards, présentations
+- **Contenu** : Échantillon représentatif avec fraudes et transactions normales
+- **Temps traitement** : 1-2 secondes
 
-**Format :** Identique au dataset complet (30 colonnes : Time, V1-V28, Amount)
+### `sample_transactions_large.csv` (5,000 lignes)
+- **Usage** : Test du batch processing, démo performance
+- **Contenu** : Grand échantillon pour tester la scalabilité
+- **Temps traitement** : 3-5 secondes (traitement par chunks de 5000)
 
-**Utilisation :**
+## Génération
+
+Ces fichiers sont générés automatiquement avec :
 
 ```bash
-# Dans l'application Streamlit
-# 1. Lancez l'app : streamlit run app/streamlit_app.py
-# 2. Section "Analyse par Lot (CSV)"
-# 3. Uploadez : data/examples/sample_transactions.csv
-
-# Ou en ligne de commande
-python scripts/predict.py \
-  --model models/rf_smote_final \
-  --file data/examples/sample_transactions.csv \
-  --output predictions.csv
+python scripts/generate_sample_csv.py
 ```
 
-## Créer vos propres exemples
+**Prérequis** : Le modèle doit être entraîné (fichiers `data/processed/X_test.csv` et `y_test.csv` doivent exister).
 
-Si vous avez accès au dataset complet :
+## Format
 
-```python
-import pandas as pd
+Tous les fichiers contiennent les colonnes suivantes :
+- `Amount` : Montant de la transaction (€)
+- `Time` : Temps écoulé depuis la première transaction (secondes)
+- `V1` à `V28` : Variables PCA pour confidentialité
 
-# Charger le dataset
-df = pd.read_csv("data/raw/creditcard.csv")
+**Note** : La colonne `Class` (fraude/normale) est **volontairement absente** pour tester la prédiction du modèle.
 
-# Extraire un échantillon
-sample = df.sample(n=10, random_state=42)
+## Utilisation dans l'App Streamlit
 
-# Retirer la colonne Class pour tester les prédictions
-X_sample = sample.drop(columns=["Class"])
-X_sample.to_csv("data/examples/my_sample.csv", index=False)
+1. Lancer l'application : `streamlit run app/streamlit_app.py`
+2. Descendre à la section "📁 Analyse par Lot (CSV)"
+3. Uploader l'un des fichiers d'exemple
+4. Observer les résultats : détections, visualisations, export
+
+## Régénération
+
+Pour régénérer les fichiers avec de nouveaux échantillons :
+
+```bash
+rm data/examples/sample_*.csv
+python scripts/generate_sample_csv.py
 ```
-
-## Note
-
-Ces fichiers d'exemple **peuvent être versionnés dans Git** car ils sont petits (<1 KB).

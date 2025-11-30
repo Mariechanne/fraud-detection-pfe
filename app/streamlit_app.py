@@ -270,10 +270,10 @@ with st.sidebar:
     with st.expander("ℹ️ Informations Techniques"):
         st.markdown(
             f"""
-        **Algorithme**: Random Forest + SMOTE  
-        **Features**: {len(cols.get('all_cols', []))}  
-        **Seuil optimal**: {THRESHOLD:.4f}  
-        **Pipeline**: StandardScaler → SMOTE → RF  
+        **Algorithme**: Random Forest + SMOTE
+        **Features**: {len(cols.get('all_cols', []))}
+        **Seuil optimal**: {THRESHOLD:.4f}
+        **Pipeline**: Preprocessing (Amount/Time scaling) → SMOTE → RandomForest (300 trees)
         **Session**: {datetime.now().strftime('%d/%m/%Y à %H:%M')}
         """
         )
@@ -287,22 +287,81 @@ with st.sidebar:
 # =========================
 st.markdown("## 🔍 Analyse de Transaction Unique")
 
-# Bouton exemple
-try:
-    DEMO_X = pd.read_csv(ROOT / "data" / "processed" / "X_test.csv")
-    DEMO_y = pd.read_csv(ROOT / "data" / "processed" / "y_test.csv").squeeze()
-except Exception:
-    DEMO_X, DEMO_y = None, None
+# Charger des exemples prédéfinis pour la démo
+@st.cache_data(show_spinner=False)
+def load_demo_examples():
+    """Charge 25 exemples prédéfinis (15 fraudes + 10 normales) pour faciliter les démonstrations."""
+    try:
+        X = pd.read_csv(ROOT / "data" / "processed" / "X_test.csv")
+        y = pd.read_csv(ROOT / "data" / "processed" / "y_test.csv").squeeze()
 
-col_demo1, col_demo2, col_demo3 = st.columns([2, 1, 2])
+        # Sélectionner des exemples variés
+        fraud_indices = y[y == 1].index.tolist()
+        normal_indices = y[y == 0].index.tolist()
 
-with col_demo2:
-    if DEMO_X is not None:
-        if st.button("⚡ Charger Exemple", use_container_width=True):
-            fraud_idx = int(DEMO_y[DEMO_y == 1].index[0])
-            row = DEMO_X.iloc[fraud_idx].to_dict()
-            st.session_state["_demo_payload"] = row
-            st.rerun()
+        examples = {}
+
+        # 15 Fraudes avec montants affichés pour faciliter l'identification
+        num_frauds = min(15, len(fraud_indices))
+        for i in range(num_frauds):
+            idx = fraud_indices[i]
+            row = X.iloc[idx]
+            amount = row.get("Amount", 0)
+            examples[f"🚨 Fraude #{i+1:02d} — {amount:.2f}€"] = row.to_dict()
+
+        # 10 Transactions normales avec montants affichés
+        num_normals = min(10, len(normal_indices))
+        # Espacer les indices pour avoir plus de variété
+        step = max(1, len(normal_indices) // num_normals)
+        for i in range(num_normals):
+            idx = normal_indices[i * step]
+            row = X.iloc[idx]
+            amount = row.get("Amount", 0)
+            examples[f"✅ Normale #{i+1:02d} — {amount:.2f}€"] = row.to_dict()
+
+        return examples
+    except Exception:
+        return {}
+
+# Charger les exemples
+demo_examples = load_demo_examples()
+
+# Interface de sélection d'exemples
+if demo_examples:
+    st.info("💡 **Astuce** : Sélectionnez un exemple prédéfini ci-dessous pour faciliter la démonstration, ou saisissez manuellement les valeurs.")
+
+    col_demo1, col_demo2 = st.columns([3, 2])
+
+    with col_demo1:
+        example_choice = st.selectbox(
+            "📋 Exemples prédéfinis",
+            options=["-- Saisie manuelle --"] + list(demo_examples.keys()),
+            help="Choisissez un exemple de transaction pour tester rapidement le système"
+        )
+
+    with col_demo2:
+        if example_choice != "-- Saisie manuelle --":
+            if st.button("⚡ Charger l'exemple sélectionné", use_container_width=True):
+                st.session_state["_demo_payload"] = demo_examples[example_choice]
+                st.rerun()
+
+    # Afficher des infos sur l'exemple sélectionné
+    if example_choice != "-- Saisie manuelle --":
+        example_data = demo_examples[example_choice]
+        col_info1, col_info2, col_info3 = st.columns(3)
+
+        with col_info1:
+            st.metric(
+                "Type attendu",
+                "FRAUDE" if "🚨" in example_choice else "NORMALE",
+                delta="⚠️ Risque" if "🚨" in example_choice else "✅ Sûre"
+            )
+        with col_info2:
+            st.metric("Montant", f"{example_data.get('Amount', 0):.2f} €")
+        with col_info3:
+            st.metric("Temps", f"{example_data.get('Time', 0):.0f} s")
+else:
+    st.caption("ℹ️ Les exemples prédéfinis seront disponibles après l'entraînement du modèle (data/processed/X_test.csv)")
 
 with st.form("single_tx_form"):
     # Initialisation des valeurs

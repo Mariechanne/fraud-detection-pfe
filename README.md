@@ -7,7 +7,7 @@
 
 > **Projet de Fin d'Études** — Détection automatique de transactions bancaires frauduleuses par Machine Learning
 
-Application web interactive développée avec **Streamlit** permettant de détecter les fraudes bancaires en temps réel avec une précision exceptionnelle (**PR-AUC: 0.84**, **ROC-AUC: 0.97**).
+Application web interactive développée avec **Streamlit** permettant de détecter les fraudes bancaires en temps réel avec une précision exceptionnelle (**PR-AUC: 0.833**, **ROC-AUC: 0.973**).
 
 ---
 
